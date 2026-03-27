@@ -13,6 +13,18 @@ unregistered = lambda message: not database.is_user_registered(message.from_user
 BOT_WIKI = "https://github.com/pavelmakis/telexpense/wiki"
 
 
+def format_idr(value) -> str:
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    sign = "-" if amount < 0 else ""
+    amount = abs(amount)
+    formatted = f"{amount:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"{sign}Rp {formatted}"
+
+
 async def cmd_start(message: Message):
     """This handler is called when user sends `/start` command."""
     # If user is registered, show main keyboard,
@@ -119,32 +131,39 @@ async def cmd_available(message: Message):
     amounts = user_sheet.get_account_amounts()
     max_text_lenght, max_digit_lenght = 0, 0
 
+    # Build display rows with IDR formatting
+    display_rows = []
+    for account, amount in amounts[:-1]:
+        display_rows.append((account, format_idr(amount)))
+
+    daily_available = format_idr(amounts[-1])
+
     # Finding account with the longest name and
     # the longest amount (in symbols)
-    for i in range(len(amounts)):
-        if len(amounts[i][0]) > max_text_lenght:
-            max_text_lenght = len(amounts[i][0])
-        if len(amounts[i][1]) > max_digit_lenght:
-            max_digit_lenght = len(amounts[i][1])
+    for account, amount in display_rows:
+        if len(account) > max_text_lenght:
+            max_text_lenght = len(account)
+        if len(amount) > max_digit_lenght:
+            max_digit_lenght = len(amount)
 
     # Combining answer string
     # ``` is used for parsing string in markdown to get
     # fixed width in message
     available = _("💰 Your accounts:\n\n")
     available += "```\n"
-    for i in range(len(amounts) - 1):
+    for i in range(len(display_rows)):
         # Current line lenght
-        text_lenght = len(amounts[i][0]) + len(amounts[i][1])
-        available += amounts[i][0]
+        text_lenght = len(display_rows[i][0]) + len(display_rows[i][1])
+        available += display_rows[i][0]
         # max_text_lenght + max_digit_lenght is the longest line
         # 2 (spaces) is the indent between account column and amount column
         available += " " * (max_text_lenght + max_digit_lenght - text_lenght + 2)
-        available += amounts[i][1] + "\n"
+        available += display_rows[i][1] + "\n"
     available += "```"
 
     # Adding "Daily available" from last item from get func
     available += _("\n*Daily available:*   ")
-    available += "`" + amounts[-1] + "`"
+    available += "`" + daily_available + "`"
 
     await message.answer(available, parse_mode="MarkdownV2", reply_markup=main_keyb())
 

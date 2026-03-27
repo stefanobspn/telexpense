@@ -17,11 +17,7 @@ allowed_patterns = {
 def currencies() -> ReplyKeyboardMarkup:
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton("🇺🇸 USD"), KeyboardButton("🇪🇺 EUR")],
-            [KeyboardButton("🇬🇧 GBP"), KeyboardButton("🇷🇺 RUB")],
-            [KeyboardButton("🇨🇭 CHF"), KeyboardButton("🇨🇦 CAD")],
-            [KeyboardButton("🇨🇿 CZK"), KeyboardButton("🇧🇾 BYN")],
-            [KeyboardButton("🇺🇦 UAH"), KeyboardButton("🇰🇿 KZT")],
+            [KeyboardButton("🇮🇩 IDR")],
             [KeyboardButton(_("Cancel"))]
         ],
         resize_keyboard=True,

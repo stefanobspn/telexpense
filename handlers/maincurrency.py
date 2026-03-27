@@ -11,16 +11,7 @@ from server import _, bot
 from sheet import Sheet
 
 allowed_currencies = {
-    "USD": "\u0024",
-    "EUR": "\u20AC",
-    "GBP": "\u00A3",
-    "RUB": "\u20BD",
-    "CHF": "CHF",
-    "CAD": "CA\u0024",
-    "CZK": "\u004B\u010D",
-    "BYN": "Br",
-    "UAH": "\u20B4",
-    "KZT": "\u20B8",
+    "IDR": "Rp",
 }
 
 
@@ -119,7 +110,7 @@ async def update_format(message: Message, state: FSMContext):
     except MessageToEditNotFound:
         await bot.send_message(message.chat.id, _("Updating formats..."))
 
-    sym = "$" + allowed_currencies[currency]
+    sym = allowed_currencies[currency]
     try:
         user_sheet.set_main_cur_format(
             currencies.allowed_patterns[pattern].format(s=sym)

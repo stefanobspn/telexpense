@@ -91,7 +91,9 @@ class Sheet:
         main_sheet = self.user_sheet.worksheet("Main")
 
         # Sending query to get accounts and its amounts and daily available
-        data = main_sheet.batch_get(["N7:N26", "O7:O26", "N3"])
+        data = main_sheet.batch_get(
+            ["N7:N26", "P7:P26", "N3"], value_render_option="UNFORMATTED_VALUE"
+        )
 
         # Parsing data
         parsed_data = []
