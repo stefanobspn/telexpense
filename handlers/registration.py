@@ -2,7 +2,6 @@ from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
-from aiogram.types.input_media import InputMediaVideo
 from gspread.utils import extract_id_from_url
 
 import database
@@ -70,21 +69,9 @@ async def process_user_option(call: CallbackQuery):
     await bot.answer_callback_query(call.id)
 
     if call.data == "new_sheet":
-        await bot.send_video(
-            # For each bot one file has different file_id. Thats why I need one
-            # file_id for my test bot and another for my production bot
-            #
-            # If you need to get file_id for your bot, send yourself a message with file
-            # from you bot using Telegram API in browser. In the result there will be
-            # file_id field
+        await bot.send_message(
             call.from_user.id,
-            # for test bot
-            # video="CgACAgQAAxkDAAICnmKTrx5fRvoBSbfcmGHrpNOTrmByAAKGAwACxs6cUOdnAc6h666dJAQ",
-            # for telexpense
-            video="CgACAgQAAxkDAAIk8GKTsJeiKNiFtQV5r3Y5TxnzI6WwAAKGAwACxs6cUJBCE840i8xkJAQ",
-            width=1512,
-            height=946,
-            caption=_(
+            _(
                 "*STEP 1*\n\n"
                 "Copy this Google Sheet template to your Google account. "
                 "You do this to ensure that your financial data belongs only to you.\n\n"
@@ -95,10 +82,6 @@ async def process_user_option(call: CallbackQuery):
             parse_mode="Markdown",
             reply_markup=registration.copytemplate_done_keyb(),
         )
-
-        # Deleting previous message because I cant edit it
-        # because it is media message
-        await bot.delete_message(call.from_user.id, call.message.message_id)
 
         # Setting state
         await RegistrationForm.connect_new.set()
@@ -137,22 +120,16 @@ async def add_bot_email(call: CallbackQuery):
     # Answer to query
     await bot.answer_callback_query(call.id)
 
-    await bot.edit_message_media(
-        InputMediaVideo(
-            # for test bot
-            # "CgACAgQAAxkDAAICpmKTsnx3QJm2mI8cA61YzzZpK9IyAAJtAwAC7SukUMWd2HYBF9nqJAQ",
-            # for telexpense
-            "CgACAgQAAxkDAAIk-2KTuhq5jmAyOt2GS2xD73Vo6cCIAAJtAwAC7SukULuOaMN-Ao5_JAQ",
-            caption=_(
-                "*STEP 2*\n\n"
-                "Add me to the table as an editor so I can add transactions "
-                "and read the balance. Here is my email:\n\n"
-                "{email}".format(email=BOT_SERVICE_EMAIL)
-            ),
-            parse_mode="Markdown",
+    await bot.edit_message_text(
+        _(
+            "*STEP 2*\n\n"
+            "Add me to the table as an editor so I can add transactions "
+            "and read the balance. Here is my email:\n\n"
+            "{email}".format(email=BOT_SERVICE_EMAIL)
         ),
         call.from_user.id,
         call.message.message_id,
+        parse_mode="Markdown",
         reply_markup=registration.addemail_done_keyb(),
     )
 
