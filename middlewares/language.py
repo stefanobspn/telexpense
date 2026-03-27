@@ -8,6 +8,7 @@ import database
 I18N_DOMAIN = 'telexpense'
 BASE_DIR = Path(__file__).parent.parent
 LOCALES_DIR = BASE_DIR / 'locales'
+SUPPORTED_LOCALES = {"en"}
 
 
 class ACLMiddleware(I18nMiddleware):
@@ -18,7 +19,10 @@ class ACLMiddleware(I18nMiddleware):
         user_lang = database.get_user_lang(user.id)
 
         # If None, return english
-        return user_lang or "en"
+        if user_lang in SUPPORTED_LOCALES:
+            return user_lang
+
+        return "en"
 
 
 def setup_language(dp):

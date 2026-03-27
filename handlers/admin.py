@@ -28,7 +28,6 @@ async def mailing(message: Message):
     markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton("Английский", callback_data="send_en")],
-            [InlineKeyboardButton("Русский", callback_data="send_ru")],
             [InlineKeyboardButton("Отмена", callback_data="cancel")],
         ]
     )

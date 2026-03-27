@@ -15,7 +15,6 @@ async def cmd_language(message: Message):
     markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")],
-            [InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru")],
             [InlineKeyboardButton(_("Cancel"), callback_data="cancel")],
         ]
     )
@@ -56,5 +55,5 @@ def register_language_cmd(dp: Dispatcher):
     dp.register_message_handler(cmd_language, commands=["language"])
     dp.register_callback_query_handler(
         process_language,
-        lambda c: c.data and c.data in ["lang_ru", "lang_en", "cancel"],
+        lambda c: c.data and c.data in ["lang_en", "cancel"],
     )
