@@ -1,9 +1,10 @@
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.utils.exceptions import MessageToEditNotFound
 
 import database
+import records
 from keyboards.user import main_keyb, register_keyb
 from server import _, bot
 from sheet import Sheet
@@ -180,7 +181,157 @@ async def undo_transaction(message: Message):
         await message.answer(_("👌 Successfully deleted last transaction!"))
 
 
+async def process_shortcut_record(message: Message, state: FSMContext):
+    """Process shortcut format: -50k jajan cash optional description"""
+    parsed = records.parse_shortcut_record(message.text, message.from_user.id)
+
+    if parsed is None:
+        return  # Not a valid shortcut, ignore
+
+    if parsed.get("error"):
+        error = parsed["error"]
+        if error == "invalid_format":
+            await message.answer(
+                _(
+                    "❌ Wrong format.\n"
+                    "Use: `-50k category account optional description`\n"
+                    "Example: `-50k jajan cash kopi pagi`"
+                ),
+                parse_mode="Markdown",
+                reply_markup=main_keyb(),
+            )
+            return
+
+        if error == "invalid_amount":
+            await message.answer(
+                _("❌ Cannot parse amount. Use number like 50, 50k, or 1.5m"),
+                reply_markup=main_keyb(),
+            )
+            return
+
+        if error == "unknown_category":
+            categories = parsed.get("available") or []
+            categories_text = ", ".join(categories[:10])
+            if len(categories) > 10:
+                categories_text += " ..."
+            await message.answer(
+                _("❌ Category not found. Available categories:\n") + categories_text,
+                reply_markup=main_keyb(),
+            )
+            return
+
+        if error == "unknown_account":
+            accounts = parsed.get("available") or []
+            accounts_text = ", ".join(accounts[:10])
+            if len(accounts) > 10:
+                accounts_text += " ..."
+            await message.answer(
+                _("❌ Account not found. Available accounts:\n") + accounts_text,
+                reply_markup=main_keyb(),
+            )
+            return
+
+        await message.answer(
+            _("❌ Cannot process shortcut now. Try again later."),
+            reply_markup=main_keyb(),
+        )
+        return
+
+    # Format amount for display
+    amount_display = f"{parsed['amount']:,.0f}".replace(',', '.')
+    record_type_symbol = "➖" if parsed['type'] == "outcome" else "➕"
+
+    # Build confirmation message
+    confirm_msg = f"{record_type_symbol} **{parsed['category']}**\n"
+    confirm_msg += f"Amount: `{amount_display}`\n"
+    if parsed['description']:
+        confirm_msg += f"Note: {parsed['description']}\n"
+    confirm_msg += f"Account: {parsed['account']}"
+
+    # Inline buttons for confirmation
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(_("✅ Confirm"), callback_data="shortcut_confirm"),
+                InlineKeyboardButton(_("❌ Cancel"), callback_data="shortcut_cancel"),
+            ]
+        ]
+    )
+
+    # Store parsed data in state for callback
+    async with state.proxy() as data:
+        data["shortcut_parsed"] = parsed
+
+    await state.set_state("shortcut_confirm")
+    await message.answer(
+        confirm_msg,
+        reply_markup=markup,
+        parse_mode="Markdown",
+    )
+
+
+async def shortcut_confirm(call: CallbackQuery, state: FSMContext):
+    """Handle shortcut confirmation from inline buttons"""
+    await bot.answer_callback_query(call.id)
+    
+    async with state.proxy() as data:
+        parsed = data.get('shortcut_parsed')
+    
+    if not parsed:
+        await bot.send_message(call.from_user.id, _("Error: data expired"))
+        await state.finish()
+        return
+    
+    # Format data for sheet insertion (date, description, category, amount, account)
+    # For expenses, amount should be negative
+    record_data = [
+        parsed['date'],
+        parsed['description'],
+        parsed['category'],
+        -parsed['amount'] if parsed['type'] == 'outcome' else parsed['amount'],
+        parsed['account']
+    ]
+    
+    try:
+        user_sheet = Sheet(database.get_sheet_id(call.from_user.id))
+        user_sheet.add_record(record_data)
+        
+        # Success message
+        amount_display = f"{parsed['amount']:,.0f}".replace(',', '.')
+        await bot.edit_message_text(
+            f"✅ {parsed['category']}: {amount_display} added!",
+            call.from_user.id,
+            call.message.message_id,
+            reply_markup=None
+        )
+    except Exception as e:
+        await bot.edit_message_text(
+            _("❌ Error adding record. Try again or use /expense"),
+            call.from_user.id,
+            call.message.message_id,
+            reply_markup=None
+        )
+    
+    await state.finish()
+
+
+async def shortcut_cancel(call: CallbackQuery, state: FSMContext):
+    """Cancel shortcut confirmation"""
+    await bot.answer_callback_query(call.id)
+    await bot.edit_message_text(
+        "Cancelled",
+        call.from_user.id,
+        call.message.message_id,
+        reply_markup=None
+    )
+    await state.finish()
+
+
 def register_user(dp: Dispatcher):
+    dp.register_message_handler(
+        process_shortcut_record, 
+        lambda msg: msg.text and msg.text[0] in ['-', '+'] and not msg.text.startswith(('--', '++'))
+    )
     dp.register_message_handler(
         answer_unregistered, unregistered, content_types=["any"]
     )
@@ -199,3 +350,5 @@ def register_user(dp: Dispatcher):
         cmd_available, lambda message: message.text.startswith("💲Баланс")
     )
     dp.register_message_handler(undo_transaction, commands=["undo"])
+    dp.register_callback_query_handler(shortcut_confirm, lambda c: c.data == "shortcut_confirm", state="shortcut_confirm")
+    dp.register_callback_query_handler(shortcut_cancel, lambda c: c.data == "shortcut_cancel", state="shortcut_confirm")

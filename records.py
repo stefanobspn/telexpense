@@ -131,3 +131,85 @@ def parse_transaction(raw_transaction: list, user_id: str) -> list:
             parsed_data.insert(0, sheet_data["today"])
 
     return parsed_data
+
+
+def parse_shortcut_record(text: str, user_id: str) -> dict | None:
+    """
+    Parse shortcut format: -50k jajan cash optional description
+    
+    Format:
+    - First char: - (expense) or + (income)
+    - Amount with k/m support: 50k, 100, 1.5m
+    - Second word: category
+    - Third word: account
+    - Remaining: description (optional)
+    
+    Returns dict with parsed data or error payload
+    """
+    text = text.strip()
+    
+    # Check if starts with + or -
+    if not text or text[0] not in ['+', '-']:
+        return None
+    
+    record_type = "income" if text[0] == '+' else "outcome"
+    text = text[1:].strip()
+    
+    # Split by spaces
+    parts = text.split(maxsplit=3)
+    if len(parts) < 3:
+        return {"error": "invalid_format"}
+    
+    amount_str, category_str, account_str = parts[0], parts[1], parts[2]
+    description = parts[3] if len(parts) > 3 else ""
+    
+    # Parse amount (50k, 100, 1.5m)
+    try:
+        amount_str = amount_str.replace(",", ".")
+        if amount_str.lower().endswith('k'):
+            amount = float(amount_str[:-1]) * 1000
+        elif amount_str.lower().endswith('m'):
+            amount = float(amount_str[:-1]) * 1000000
+        else:
+            amount = float(amount_str)
+    except ValueError:
+        return {"error": "invalid_amount"}
+    
+    # Get sheet data for category validation
+    try:
+        user_sheet = sheet.Sheet(database.get_sheet_id(user_id))
+        sheet_data = user_sheet.get_day_categories_accounts()
+    except Exception:
+        return {"error": "sheet_unavailable"}
+    
+    # Validate category
+    if record_type == "income":
+        category = _parse_income_category(category_str, sheet_data)
+        if not category:
+            return {
+                "error": "unknown_category",
+                "available": sheet_data["income categories"],
+            }
+    else:
+        category = _parse_outcome_category(category_str, sheet_data)
+        if not category:
+            return {
+                "error": "unknown_category",
+                "available": sheet_data["outcome categories"],
+            }
+    
+    account = _parse_account(account_str, sheet_data)
+    if not account:
+        return {
+            "error": "unknown_account",
+            "available": sheet_data["accounts"],
+        }
+    
+    return {
+        "type": record_type,
+        "amount": amount,
+        "category": category,
+        "description": description,
+        "account": account,
+        "date": sheet_data["today"],
+    }
