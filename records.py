@@ -203,9 +203,9 @@ def parse_shortcut_record(text: str, user_id: str) -> dict | None:
     category = None
     account = None
     description = ""
+    remaining_after_category = []
 
-    # Try all splits: [category tokens][account tokens][description tokens]
-    # Prefer longer category match first, then longer account match.
+    # Step 1: find category (longest prefix match)
     for category_end in range(len(tokens) - 1, 0, -1):
         category_candidate = " ".join(tokens[:category_end])
         matched_category = _match_from_list_case_insensitive(
@@ -214,33 +214,33 @@ def parse_shortcut_record(text: str, user_id: str) -> dict | None:
         if not matched_category:
             continue
 
+        category = matched_category
         remaining_after_category = tokens[category_end:]
-        for account_end in range(len(remaining_after_category), 0, -1):
-            account_candidate = " ".join(remaining_after_category[:account_end])
-            matched_account = _match_from_list_case_insensitive(
-                account_candidate, available_accounts
-            )
-            if not matched_account:
-                continue
-
-            category = matched_category
-            account = matched_account
-            description = " ".join(remaining_after_category[account_end:])
-            break
-
-        if category and account:
-            break
-
-    if category and not account:
-        return {
-            "error": "unknown_account",
-            "available": available_accounts,
-        }
+        break
 
     if not category:
         return {
             "error": "unknown_category",
             "available": available_categories,
+        }
+
+    # Step 2: find account (longest prefix match from remaining tokens)
+    for account_end in range(len(remaining_after_category), 0, -1):
+        account_candidate = " ".join(remaining_after_category[:account_end])
+        matched_account = _match_from_list_case_insensitive(
+            account_candidate, available_accounts
+        )
+        if not matched_account:
+            continue
+
+        account = matched_account
+        description = " ".join(remaining_after_category[account_end:])
+        break
+
+    if not account:
+        return {
+            "error": "unknown_account",
+            "available": available_accounts,
         }
 
     # Keep compatibility with existing validation flow
