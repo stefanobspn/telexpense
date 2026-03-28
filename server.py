@@ -1,10 +1,11 @@
 import logging
 import os
-
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-
 from middlewares.language import setup_language
+
+load_dotenv()
 
 API_TOKEN = os.getenv("TELEXPENSE_TOKEN")
 
